@@ -8,18 +8,23 @@ use image::{DynamicImage, ImageError, ImageFormat, imageops, RgbaImage};
 use rayon::prelude::*;
 use walkdir::WalkDir;
 
+const CSV_NOT_FOUND: &str = "
+Failed to find vcglist.csv in any subdirectory,
+you should extract system.dat and other resources into this folder,
+then rerun this program.";
+const IMAGE_NOT_FOUND: &str = "
+Missing image file,
+did you well extracted all the images?";
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start_time = Instant::now();
     let processed_images = AtomicUsize::new(0);
     let folder = PathBuf::from("../..");
-    let csv_not_found = "Failed to find vcglist.csv in any subdirectory,
-    you should extract system.dat and other resources into this folder,
-    then rerun this program.";
     let csv_file_path = WalkDir::new(&folder)
         .into_iter()
         .filter_map(Result::ok)
         .find(|e| e.file_name() == "vcglist.csv")
-        .ok_or(csv_not_found)?
+        .ok_or(CSV_NOT_FOUND)?
         .into_path();
     let cg_list = fs::read_to_string(csv_file_path)?;
     let total_images = cg_list.lines().count();
@@ -77,8 +82,7 @@ fn find_and_open_image(folder: &Path, file_name: &str) -> Result<DynamicImage, I
         .into_iter()
         .filter_map(Result::ok)
         .find(|e| e.file_name() == file_name)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Image file not found,
-        did you well extracted all the images?"))?
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, IMAGE_NOT_FOUND))?
         .into_path();
     image::open(file_path)
 }
@@ -93,7 +97,7 @@ fn combine_images(images: &[DynamicImage]) -> Result<RgbaImage, ImageError> {
             }
             None => Ok(Some(watermark)),
         }
-    }).map(|combined| combined.expect("Image not found, did you well extracted all the images?"))
+    }).map(|combined| combined.expect(IMAGE_NOT_FOUND))
 }
 
 fn print_progress(processed: usize, total_images: usize, start_time: Instant) {
